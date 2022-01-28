@@ -1,0 +1,128 @@
+import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
+import java.util.Scanner;
+
+public class Main {
+    public static void main(String[] args) {
+        System.out.println("Enter your message:");
+        Scanner scanner = new Scanner(System.in);
+        String message = scanner.nextLine();
+        if (message.length() == 0) {
+            System.out.println("Empty message!");
+            System.exit(0);
+        }
+        byte[] symbols = message.getBytes(StandardCharsets.US_ASCII);
+        StringBuilder messageToInt = new StringBuilder();
+        for (byte symbol : symbols) {
+            if (String.valueOf(symbol).length() == 2)
+                messageToInt.append("0");
+            else if (String.valueOf(symbol).length() == 1)
+                messageToInt.append("00");
+            messageToInt.append(symbol);
+        }
+        System.out.println("The message in bytes is: " + messageToInt);
+        System.out.println("Enter prime number p:");
+        BigInteger p;
+        while (true) {
+            p = scanner.nextBigInteger();
+            if (p.isProbablePrime(100))
+                break;
+            else System.out.println("p is not prime number! Repeat input");
+        }
+        System.out.println("Enter prime number q:");
+        BigInteger q;
+        while (true) {
+            q = scanner.nextBigInteger();
+            if (q.isProbablePrime(100))
+                break;
+            else System.out.println("q is not prime number! Repeat input");
+        }
+        BigInteger n = p.multiply(q);
+        BigInteger phi = p.subtract(BigInteger.ONE).multiply(q.subtract(BigInteger.ONE));
+        System.out.println("PHI = " + phi);
+        System.out.println("Enter number e coprime phi ( 1 < e < phi):");
+        BigInteger e;
+        while (true) {
+            e = scanner.nextBigInteger();
+            if (phi.gcd(e).intValue() < 2 && e.compareTo(phi) < 0 && e.compareTo(BigInteger.ONE) > 0)
+                break;
+            else System.out.println("e is not coprime phi number! Repeat input");
+        }
+        BigInteger d;
+        System.out.println("Enter secret exhibitor d multiplicatively inverse e (mod phi):");
+        while (true) {
+            d = scanner.nextBigInteger();
+            if (d.multiply(e).remainder(phi).compareTo(BigInteger.ONE) == 0) {
+                break;
+            } else System.out.println("d is not multiplicatively inverse e (mod phi)! Repeat input");
+        }
+        System.out.println("Open key is: (" + e + "," + n + ")");
+        System.out.println("Close key is: (" + d + "," + n + ")");
+        System.out.println("______________Encrypting____________");
+        int nSize = n.toString().length();
+        int partsCount;
+        if (messageToInt.length() % (nSize - 1) == 0)
+            partsCount = messageToInt.length() / (nSize - 1);
+        else partsCount = messageToInt.length() / (nSize - 1) + 1;
+        StringBuilder[] parts = new StringBuilder[partsCount];
+        int point = 0;
+        for (int i = 0; i < partsCount - 1; i++) {
+            parts[i] = new StringBuilder(messageToInt.substring(point, point + nSize - 1));
+            point += nSize - 1;
+        }
+        parts[partsCount - 1] = new StringBuilder(messageToInt.substring(point));
+        String endPadding = Integer.toString(n.intValue() % nSize % 10);
+        int countToPadding = nSize - 1 - parts[partsCount - 1].length();
+        for (int i = 0; i < countToPadding; i++)
+            parts[partsCount - 1].append(endPadding);
+        BigInteger encryptedPartInt = null;
+        StringBuilder encryptedTextInt = new StringBuilder();
+        for (int i = 0; i < partsCount; i++) {
+            BigInteger text = new BigInteger(parts[i].toString());
+            System.out.println("Part " + (i + 1) + " in bytes is: " + text);
+            encryptedPartInt = text.modPow(e, n);
+            System.out.println("Encrypted part " + (i + 1) + ": " + encryptedPartInt);
+            if (i > 0 && encryptedPartInt.toString().length() < nSize) {
+                encryptedTextInt.append("0".repeat(Math.max(0, nSize - encryptedPartInt.toString().length())));
+            }
+            encryptedTextInt.append(encryptedPartInt);
+        }
+        System.out.println("Encrypted message: " + encryptedTextInt);
+        // decrypting
+        System.out.println("______________Decrypting____________");
+        StringBuilder[] encryptedParts = new StringBuilder[partsCount];
+        int encryptedPoint = 0;
+        for (int i = 0; i < partsCount - 1; i++) {
+            encryptedParts[i] = new StringBuilder(encryptedTextInt.substring(encryptedPoint, encryptedPoint + nSize));
+            encryptedPoint += nSize;
+        }
+        encryptedParts[encryptedParts.length - 1] = new StringBuilder(encryptedTextInt.substring(encryptedPoint));
+        BigInteger decryptedPartInt = null;
+        StringBuilder decryptedTextInt = new StringBuilder();
+        for (int i = 0; i < partsCount; i++) {
+            BigInteger text = new BigInteger(encryptedParts[i].toString());
+            System.out.println("Encrypted part " + (i + 1) + " in bytes is: " + text);
+            decryptedPartInt = text.modPow(d, n);
+            System.out.println("Decrypted part " + (i + 1) + ": " + decryptedPartInt);
+            if (decryptedPartInt.toString().length() != nSize)
+                decryptedTextInt.append("0".repeat(Math.max(0, nSize - 1 - decryptedPartInt.toString().length())));
+            decryptedTextInt.append(decryptedPartInt);
+        }
+        String decodedText = decryptedTextInt.substring(0, decryptedTextInt.length() - countToPadding);
+        System.out.println("Decrypted message in bytes is: " + decodedText);
+        StringBuilder decryptedMessage = new StringBuilder();
+        if (decodedText.length() % 3 == 1)
+            decodedText = "00" + decodedText;
+        if (decodedText.length() % 3 == 2)
+            decodedText = "0" + decodedText;
+        for (int i = 0; i < decodedText.length(); i += 3) {
+            char ch;
+            ch = (char) Integer.parseInt(decodedText.substring(i, i + 3));
+            decryptedMessage.append(ch);
+        }
+        System.out.println("Decrypted message is: " + decryptedMessage);
+        if (message.equals(decryptedMessage.toString()))
+            System.out.println("Success! Input message and decrypted message are equal!");
+        else System.out.println("Fail! Input message and decrypted message are NOT equal!");
+    }
+}
